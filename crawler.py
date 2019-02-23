@@ -4,7 +4,6 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import time
 # import os
-# path = 'app'
 # path = os.getcwd()
 
 
@@ -30,7 +29,7 @@ class Crawler(object):
         # chrome_options.add_argument('--disable-gpu')
         # chrome_options.add_argument('--incognito')
         # chrome_options.add_argument('--disable-browser-side-navigation')
-        # chrome_path = '/{}/chromedriver'.format(path)
+        # chrome_path = '/{}/old/chromedriver'.format(path)
         # self.driver = webdriver.Chrome(
         #     chrome_path, chrome_options=chrome_options)
 

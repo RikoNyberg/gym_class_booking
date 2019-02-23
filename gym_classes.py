@@ -15,8 +15,6 @@ logging.basicConfig(format='%(message)s', level=logging.WARNING)
 
 class GymClasses():
     def __init__(self, username, password):
-        logging.warning('Working 3')
-
         self.username = username
         self.password = password
         self.website = 'Fitness24seven'
@@ -212,13 +210,12 @@ def register_to_classes(username, password):
 
 
 def update_classes(username, password):
-    logging.warning('Working 2')
     gym_classes = GymClasses(username, password)
-    logging.warning('Working 4')
     gym_classes.update_and_register_classes()
 
 
 for hour in range(7, 22):
+    hour = hour - 2  # Because Finland is UTF-2
     hour = '0{}'.format(hour)[-2:]
     for minute in range(0, 60, 5):
         minute = '0{}'.format(minute)[-2:]
@@ -226,11 +223,8 @@ for hour in range(7, 22):
         schedule.every().day.at(time_format).do(
             register_to_classes, USERNAME, PASSWORD)
 
-# schedule.every(10).minutes.do(job)
-schedule.every(5).seconds.do(update_classes, USERNAME, PASSWORD)
-# schedule.every().day.at("00:35").do(update_classes, USERNAME, PASSWORD)
+schedule.every().day.at("03:00").do(update_classes, USERNAME, PASSWORD)
 
 while True:
-    logging.warning('Working')
     schedule.run_pending()
-    time.sleep(10)
+    time.sleep(120)
