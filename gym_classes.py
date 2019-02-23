@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 import datetime
+from pytz import timezone
 import random
 from crawler import Crawler
 from selenium.webdriver.common.keys import Keys
@@ -15,6 +16,7 @@ logging.basicConfig(format='%(message)s', level=logging.WARNING)
 
 class GymClasses():
     def __init__(self, username, password):
+        self.tz = timezone('Europe/Helsinki')
         self.username = username
         self.password = password
         self.website = 'Fitness24seven'
@@ -55,7 +57,7 @@ class GymClasses():
                 '$ne': False
             },
             'start_time': {
-                '$lte': (datetime.datetime.now() + datetime.timedelta(days=2))
+                '$lte': (datetime.datetime.now(self.tz) + datetime.timedelta(days=2))
             }})
         return list(gym_classes_to_register)
 
@@ -190,7 +192,7 @@ class GymClasses():
             self.updated_classes_count))
         logging.warning('All classes: {}'.format(self.all_classes_count))
         logging.warning('Timestamp: {}'.format(
-            datetime.datetime.now().strftime("%Y-%m-%d at %H:%M")))
+            datetime.datetime.now(self.tz).strftime("%Y-%m-%d at %H:%M")))
         logging.warning('------------')
 
 
@@ -202,7 +204,7 @@ def register_to_classes(username, password):
             '$ne': False
         },
         'start_time': {
-            '$lte': (datetime.datetime.now() + datetime.timedelta(days=2))
+            '$lte': (datetime.datetime.now(timezone('Europe/Helsinki')) + datetime.timedelta(days=2))
         }})
     if list(gym_classes_to_register):
         gym_classes = GymClasses(username, password)
@@ -223,7 +225,7 @@ for hour in range(7, 22):
         schedule.every().day.at(time_format).do(
             register_to_classes, USERNAME, PASSWORD)
 
-schedule.every().day.at("03:00").do(update_classes, USERNAME, PASSWORD)
+schedule.every().day.at("06:00").do(update_classes, USERNAME, PASSWORD)
 
 while True:
     schedule.run_pending()
