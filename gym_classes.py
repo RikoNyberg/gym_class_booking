@@ -54,7 +54,7 @@ class GymClasses():
         gym_classes_to_register = self.gym_classes_collection.find({
             'register_to_class': True,
             'registering_done': {
-                '$ne': False
+                '$ne': True
             },
             'start_time': {
                 '$lte': (datetime.datetime.now(self.tz) + datetime.timedelta(days=2))
@@ -201,7 +201,7 @@ def register_to_classes(username, password):
     gym_classes_to_register = gym_classes_collection.find({
         'register_to_class': True,
         'registering_done': {
-            '$ne': False
+            '$ne': True
         },
         'start_time': {
             '$lte': (datetime.datetime.now(timezone('Europe/Helsinki')) + datetime.timedelta(days=2))
@@ -225,7 +225,7 @@ for hour in range(7, 22):
         schedule.every().day.at(time_format).do(
             register_to_classes, USERNAME, PASSWORD)
 
-schedule.every().day.at("06:00").do(update_classes, USERNAME, PASSWORD)
+schedule.every().day.at("05:00").do(update_classes, USERNAME, PASSWORD)
 
 while True:
     schedule.run_pending()
