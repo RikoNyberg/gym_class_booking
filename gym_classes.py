@@ -41,9 +41,9 @@ class GymClasses():
             gym_day.click()
             self.rand_sleep()
 
-            gym_classes = self.get_gym_class_elements()
-            for j in range(len(gym_classes)):
-                gym_class = self.get_gym_class(j)
+            gym_classes_count = len(self.get_gym_class_elements())
+            for j in range(gym_classes_count):
+                gym_class = self.get_gym_class(j, gym_classes_count)
                 self.insert_one_gym_class_to_mongo(gym_class)
                 self.register_to_class(gym_class, j)
                 self.all_classes_count += 1
@@ -61,7 +61,8 @@ class GymClasses():
             }})
         return list(gym_classes_to_register)
 
-    def get_gym_class(self, j):
+    def get_gym_class(self, j, gym_classes_count):
+        # TODO: make sure that all the element counts match with gym_classes_count!
         base_xpath = "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[starts-with(@class, {item})]"
         class_name = self.driver.find_elements_by_xpath(
             base_xpath.format(item='groupActivityListProduct'))[j].text
@@ -167,20 +168,23 @@ class GymClasses():
                 book_class_buttons = self.driver.find_elements_by_xpath(
                     "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']/a".format(item='groupActivityListAction'))[j]
                 if book_class_buttons:
-                    if book_class_buttons[0].text[:7] != 'Peruuta':
-                        book_class_buttons[0].click()
-                        self.gym_classes_collection.update(
-                            {'_id': class_to_register['_id']},
-                            {'$set': {
-                                'capacity_free': gym_class['capacity_free'],
-                                'queue': gym_class['queue'],
-                                'registering_done': True,
-                            }}
-                        )
-                        self.registered_classes_count += 1
+                    if book_class_buttons[0].text[:7] == 'Peruuta':
+                        logging.warning('#### Class already registered: {} ####'.format(
+                            class_to_register['_id']))
+                        pass
+                    else:
                         logging.warning(
-                            'Registered to: {}'.format(gym_class['_id']))
-                        break
+                            'Registering to class: {}'.format(gym_class['_id']))
+                        book_class_buttons[0].click()
+                    self.gym_classes_collection.update(
+                        {'_id': class_to_register['_id']},
+                        {'$set': {
+                            'capacity_free': gym_class['capacity_free'],
+                            'queue': gym_class['queue'],
+                            'registering_done': True,
+                        }})
+                    self.registered_classes_count += 1
+                    break
 
     def quit_process(self):
         self.crawler.quit_driver(self.website)
