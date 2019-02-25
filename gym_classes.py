@@ -62,9 +62,9 @@ class GymClasses():
         return list(gym_classes_to_register)
 
     def get_gym_class(self, j):
-        base_xpath = "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']"
+        base_xpath = "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[starts-with(@class, {item})]"
         class_name = self.driver.find_elements_by_xpath(
-            base_xpath.format(item='groupActivityListProduct '))[j].text
+            base_xpath.format(item='groupActivityListProduct'))[j].text
         instructor = self.driver.find_elements_by_xpath(
             base_xpath.format(item='groupActivityListPersonal'))[j].text
         capacity = self.driver.find_elements_by_xpath(base_xpath.format(
