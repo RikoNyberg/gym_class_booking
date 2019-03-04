@@ -3,8 +3,8 @@ from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import time
-# import os
-# path = os.getcwd()
+
+production = True
 
 
 class Crawler(object):
@@ -20,18 +20,22 @@ class Crawler(object):
         except AttributeError:
             pass                # Passing if opening the first driver
 
-        self.driver = webdriver.Remote(
-            "http://127.0.0.1:4444/wd/hub", DesiredCapabilities.CHROME)
-        # "host.docker.internal:4444/wd/hub", DesiredCapabilities.CHROME)
-
-        # chrome_options = webdriver.ChromeOptions()
-        # chrome_options.add_argument('--headless')
-        # chrome_options.add_argument('--disable-gpu')
-        # chrome_options.add_argument('--incognito')
-        # chrome_options.add_argument('--disable-browser-side-navigation')
-        # chrome_path = '/{}/old/chromedriver'.format(path)
-        # self.driver = webdriver.Chrome(
-        #     chrome_path, chrome_options=chrome_options)
+        if production:
+            self.driver = webdriver.Remote(
+                command_executor="http://127.0.0.1:4444/wd/hub",
+                desired_capabilities=DesiredCapabilities.CHROME)
+        else:  # development mode:
+            import os
+            path = os.getcwd()
+            chrome_path = '/{}/chromedriver'.format(path)
+            chrome_options = webdriver.ChromeOptions()
+            # chrome_options.add_argument('--headless')
+            # chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--incognito')
+            chrome_options.add_argument('--disable-browser-side-navigation')
+            chrome_path = '/{}/old/chromedriver'.format(path)
+            self.driver = webdriver.Chrome(
+                chrome_path, chrome_options=chrome_options)
 
     def open_new_website(self, url):
         whaiting_time = 40

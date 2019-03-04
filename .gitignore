@@ -2,6 +2,7 @@ credentials.py
 .DS_Store
 /old
 /testing_chrome
+chromedriver
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
