@@ -19,8 +19,7 @@ gym_classes_collection = MongoClient(MONGO_URL).gym.reservations
 def get_classes_to_register():
     gym_classes_to_register = gym_classes_collection.find({
         'register_to_class': True,
-        'registering_done': False,
-        # 'registering_done': {'$exists': False},
+        'registering_done': {'$exists': False},
         'start_time': {
             '$lte': (datetime.datetime.now() + datetime.timedelta(days=2) + datetime.timedelta(hours=2))
         }
@@ -34,7 +33,7 @@ class GymClasses():
         self.username = username
         self.password = password
         self.website = 'Fitness24seven'
-        logging.warning('{} crawler started.'.format(self.website))
+        logging.warning('\n{} crawler started.'.format(self.website))
         self.crawler = Crawler()
 
         self.gym_classes_collection = gym_classes_collection
@@ -247,7 +246,6 @@ for hour in range(7, 22):
             register_to_classes, USERNAME, PASSWORD)
 
 schedule.every().day.at("05:00").do(update_classes, USERNAME, PASSWORD)
-schedule.every(1).seconds.do(update_classes, USERNAME, PASSWORD)
 
 while True:
     schedule.run_pending()
