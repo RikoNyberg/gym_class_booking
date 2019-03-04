@@ -38,8 +38,6 @@ class GymClasses():
 
         self.gym_classes_collection = gym_classes_collection
         self.classes_to_register = get_classes_to_register()
-        logging.warning(
-            '---- Registering: {}'.format(self.classes_to_register))
         self.registered_classes_count = 0
         self.new_classes_count = 0
         self.updated_classes_count = 0
@@ -187,7 +185,6 @@ class GymClasses():
 
     def register_to_class(self, gym_class, j):
         for class_to_register in self.classes_to_register:
-            logging.warning('-- {} ## Class: {}'.format(j, gym_class['_id']))
             if class_to_register['_id'] == gym_class['_id']:
                 book_class_button = self.driver.find_elements_by_xpath(
                     "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']/a".format(item='groupActivityListAction'))[j]
@@ -248,7 +245,6 @@ for hour in range(7, 22):
             register_to_classes, USERNAME, PASSWORD)
 
 schedule.every().day.at("05:00").do(update_classes, USERNAME, PASSWORD)
-schedule.every(10).seconds.do(update_classes, USERNAME, PASSWORD)
 
 while True:
     schedule.run_pending()
