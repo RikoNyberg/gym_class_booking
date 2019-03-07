@@ -13,32 +13,55 @@ from pymongo import MongoClient, errors
 import logging
 logging.basicConfig(format='%(message)s', level=logging.WARNING)
 
+gym_users_collection = MongoClient(MONGO_URL).gym.users
 gym_classes_collection = MongoClient(MONGO_URL).gym.reservations
 
 
-def get_classes_to_register():
-    gym_classes_to_register = gym_classes_collection.find({
-        'register_to_class': True,
-        'registering_done': {'$exists': False},
-        'start_time': {
-            '$lte': (datetime.datetime.now() + datetime.timedelta(days=2) + datetime.timedelta(hours=2))
-        }
+def get_classes_to_register(membership_id=None):
+    gym_classes = gym_classes_collection.find({
+        'start_time':
+        {'$lte': (datetime.datetime.now() +
+                  datetime.timedelta(days=2) + datetime.timedelta(hours=2))}
     })
-    return list(gym_classes_to_register)
+
+    gym_classes_to_register = []
+    gym_classes_to_unregister = []
+    membership_ids = set()
+    for gym_class in list(gym_classes):
+        register_members_done = set(gym_class.get('register_members_done', []))
+        register_members = set(gym_class.get('register_members', []))
+        if register_members != register_members_done:
+            membership_ids.update(
+                register_members_done.symmetric_difference(register_members))
+            if not membership_id:
+                if register_members_done.issubset(register_members):
+                    gym_classes_to_register.append(gym_class)
+                elif register_members.issubset(register_members_done):
+                    gym_classes_to_unregister.append(gym_class)
+            else:
+                if membership_id in register_members_done.symmetric_difference(register_members):
+                    if register_members_done.issubset(register_members):
+                        gym_classes_to_register.append(gym_class)
+                    elif register_members.issubset(register_members_done):
+                        gym_classes_to_unregister.append(gym_class)
+    return gym_classes_to_register, gym_classes_to_unregister, membership_ids
 
 
 class GymClasses():
-    def __init__(self, username, password):
+    def __init__(self, username, password, name='Gym class update'):
         self.tz = timezone('Europe/Helsinki')
         self.username = username
         self.password = password
+        self.name = name
         self.website = 'Fitness24seven'
         logging.warning('\n{} crawler started.'.format(self.website))
         self.crawler = Crawler()
 
         self.gym_classes_collection = gym_classes_collection
-        self.classes_to_register = get_classes_to_register()
+        self.classes_to_register, self.classes_to_unregister, _ = get_classes_to_register(
+            membership_id=self.username)
         self.registered_classes_count = 0
+        self.unregistered_classes_count = 0
         self.new_classes_count = 0
         self.updated_classes_count = 0
         self.all_classes_count = 0
@@ -47,21 +70,30 @@ class GymClasses():
         self.driver = self.open_gym_classes_website()
 
     def update_and_register_classes(self):
-        gym_days = self.get_day_elements()
-        for i in range(len(gym_days)):
-            gym_day = self.get_day_elements()[i]  # website might be reloaded
-            gym_day.click()
-            self.rand_sleep()
+        if self.make_sure_that_username_and_password_are_correct():
+            gym_days = self.get_day_elements()
+            for i in range(len(gym_days)):
+                gym_day = self.get_day_elements()[i]
+                gym_day.click()
+                self.rand_sleep()
 
-            self.gym_classes_count = len(self.get_gym_class_elements())
-            self.get_class_elems()
-            for j in range(self.gym_classes_count):
-                gym_class = self.get_gym_class(j)
-                self.insert_one_gym_class_to_mongo(gym_class)
-                self.register_to_class(gym_class, j)
-                self.all_classes_count += 1
+                self.gym_classes_count = len(self.get_gym_class_elements())
+                self.get_class_elems()
+                for j in range(self.gym_classes_count):
+                    gym_class = self.get_gym_class(j)
+                    self.insert_one_gym_class_to_mongo(gym_class)
+                    self.register_to_class(gym_class, j)
+                    self.unregister_to_class(gym_class, j)
+                    self.all_classes_count += 1
         self.quit_process()
-        pass
+
+    def make_sure_that_username_and_password_are_correct(self):
+        logout_elem = self.driver.find_elements_by_xpath(
+            '''//*[@id='logout']''')
+        if not logout_elem:
+            logging.error('User {} has wrong password.'.format(self.username))
+            return False
+        return True
 
     def get_class_elems(self):
         base_xpath = "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[starts-with(@class, '{item}')]"
@@ -189,7 +221,6 @@ class GymClasses():
                 book_class_button = self.driver.find_elements_by_xpath(
                     "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']/a".format(item='groupActivityListAction'))[j]
                 if book_class_button:
-                    print(book_class_button.text)
                     if book_class_button.text[:7] == 'Peruuta':
                         logging.warning('#### Class already registered: {} ####'.format(
                             class_to_register['_id']))
@@ -199,21 +230,60 @@ class GymClasses():
                             'Registering to class: {}'.format(gym_class['_id']))
                         book_class_button.click()
                         self.get_class_elems()  # Getting elems again because the page is refreshed
+                    class_to_update = self.gym_classes_collection.find_one(
+                        {'_id': class_to_register['_id']})
+                    register_members_done_list = class_to_update.get(
+                        'register_members_done', [])
+                    register_members_done_list.append(self.username)
                     self.gym_classes_collection.update(
                         {'_id': class_to_register['_id']},
                         {'$set': {
                             'capacity_free': gym_class['capacity_free'],
                             'queue': gym_class['queue'],
-                            'registering_done': True,
+                            'register_members_done': register_members_done_list,
                         }})
                     self.registered_classes_count += 1
                     break
 
+    def unregister_to_class(self, gym_class, j):
+        for class_to_unregister in self.classes_to_unregister:
+            if class_to_unregister['_id'] == gym_class['_id']:
+                book_class_button = self.driver.find_elements_by_xpath(
+                    "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']/a".format(item='groupActivityListAction'))[j]
+                if book_class_button:
+                    if book_class_button.text[:7] != 'Peruuta':
+                        logging.warning('#### Class already un-registered: {} ####'.format(
+                            class_to_unregister['_id']))
+                        pass
+                    else:
+                        logging.warning(
+                            'Un-registering to class: {}'.format(gym_class['_id']))
+                        book_class_button.click()
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                        self.get_class_elems()  # Getting elems again because the page is refreshed
+                    class_to_update = self.gym_classes_collection.find_one(
+                        {'_id': class_to_unregister['_id']})
+                    register_members_done_list = class_to_update.get(
+                        'register_members_done', [])
+                    register_members_done_list.remove(self.username)
+                    self.gym_classes_collection.update(
+                        {'_id': class_to_unregister['_id']},
+                        {'$set': {
+                            'capacity_free': gym_class['capacity_free'],
+                            'queue': gym_class['queue'],
+                            'register_members_done': register_members_done_list,
+                        }})
+                    self.unregistered_classes_count += 1
+                    break
+
     def quit_process(self):
         self.crawler.quit_driver(self.website)
-        logging.warning('\n------ {} ------'.format(self.website))
+        logging.warning('\n------ {} ------'.format(self.name))
         logging.warning('Registered classes: {}'.format(
             self.registered_classes_count))
+        logging.warning('Un-registered classes: {}'.format(
+            self.unregistered_classes_count))
         logging.warning('New classes: {}'.format(self.new_classes_count))
         logging.warning('Updated classes: {}'.format(
             self.updated_classes_count))
@@ -223,10 +293,13 @@ class GymClasses():
         logging.warning('------------')
 
 
-def register_to_classes(username, password):
-    gym_classes_to_register = get_classes_to_register()
-    if list(gym_classes_to_register):
-        gym_classes = GymClasses(username, password)
+def register_to_classes():
+    _, _, membership_ids = get_classes_to_register()
+    for membership_id in membership_ids:
+        user = gym_users_collection.find_one({'_id': membership_id}, {
+            '_id': 0, 'password': 1, 'name': 1})
+        gym_classes = GymClasses(
+            membership_id, user['password'], name=user['name'])
         gym_classes.update_and_register_classes()
 
 
@@ -235,17 +308,9 @@ def update_classes(username, password):
     gym_classes.update_and_register_classes()
 
 
-for hour in range(7, 22):
-    hour = hour - 2  # Because Finland is UTF +2 and the production server is UTF +0
-    hour = '0{}'.format(hour)[-2:]
-    for minute in range(0, 60, 5):
-        minute = '0{}'.format(minute)[-2:]
-        time_format = "{}:{}".format(hour, minute)
-        schedule.every().day.at(time_format).do(
-            register_to_classes, USERNAME, PASSWORD)
-
 schedule.every().day.at("05:00").do(update_classes, USERNAME, PASSWORD)
+schedule.every(5).minutes.do(register_to_classes)
 
 while True:
     schedule.run_pending()
-    time.sleep(10)
+    time.sleep(120)
