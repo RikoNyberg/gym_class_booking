@@ -298,9 +298,13 @@ def register_to_classes():
     for membership_id in membership_ids:
         user = gym_users_collection.find_one({'_id': membership_id}, {
             '_id': 0, 'password': 1, 'name': 1})
-        gym_classes = GymClasses(
-            membership_id, user['password'], name=user['name'])
-        gym_classes.update_and_register_classes()
+        if len(user['password']) == 9 and user['name']:
+            gym_classes = GymClasses(
+                membership_id, user['password'], name=user['name'])
+            gym_classes.update_and_register_classes()
+        else:
+            logging.warning(
+                'Trying to book classes to member {} who is not a registered user')
 
 
 def update_classes(username, password):
