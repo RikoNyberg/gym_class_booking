@@ -1,4 +1,6 @@
-credentials.py
+credentials/credentials.py
+credentials/token.pickle
+credentials/credentials_google_cal.json
 .DS_Store
 /old
 /testing_chrome
