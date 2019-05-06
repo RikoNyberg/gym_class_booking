@@ -11,9 +11,11 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 
 # class MemoryCache(Cache):
-#     # This is a Class that is fixing a known cache bug: https://github.com/googleapis/google-api-python-client/issues/325#issuecomment-274349841
+#     # This is a Class that is fixing a known cache bug: 
+#     # https://stackoverflow.com/questions/40154672/importerror-file-cache-is-unavailable-when-using-python-client-for-google-ser
+#     # https://github.com/googleapis/google-api-python-client/issues/325#issuecomment-274349841
+#     
 #     _CACHE = {}
-
 #     def get(self, url):
 #         return MemoryCache._CACHE.get(url)
 
