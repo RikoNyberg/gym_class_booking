@@ -11,10 +11,10 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 
 # class MemoryCache(Cache):
-#     # This is a Class that is fixing a known cache bug: 
+#     # This is a Class that is fixing a known cache bug:
 #     # https://stackoverflow.com/questions/40154672/importerror-file-cache-is-unavailable-when-using-python-client-for-google-ser
 #     # https://github.com/googleapis/google-api-python-client/issues/325#issuecomment-274349841
-#     
+#
 #     _CACHE = {}
 #     def get(self, url):
 #         return MemoryCache._CACHE.get(url)
@@ -39,7 +39,8 @@ class GoogleCal():
                 pickle.dump(creds, token)
         if not creds:
             raise ValueError('Google API token.pickle is missing')
-        service = build('calendar', 'v3', credentials=creds, cache_discovery=False)
+        service = build('calendar', 'v3', credentials=creds,
+                        cache_discovery=False)
 
         return service
 
@@ -72,7 +73,7 @@ class GoogleCal():
             else:
                 attendee = [{'email': email}]
         else:
-            attendee = []
+            attendee = [{'email': 'f24gymclass@gmail.com'}]
 
         event = {
             'summary': 'F24 - {}'.format(class_name),
@@ -113,22 +114,28 @@ class GoogleCal():
             attendee = {'email': email}
         # First retrieve the event from the API.
         event = self.service.events().get(calendarId='primary', eventId=eventId).execute()
-        event['attendees'].append(attendee)
+        event.get('attendees')
+        if event.get('attendees', []):
+            event['attendees'].append(attendee)
+        else:
+            event['attendees'] = [attendee]
         updated_event = self.service.events().update(
             calendarId='primary', eventId=event['id'], body=event).execute()
+        print(updated_event)
 
     def remove_attendee(self, eventId, email):
         # First retrieve the event from the API.
         event = self.service.events().get(calendarId='primary', eventId=eventId).execute()
         new_attendees = []
-        for attendee in event['attendees']:
+        for attendee in event.get('attendees', []):
             if attendee['email'] == email:
                 pass
             else:
                 new_attendees.append(attendee)
         event['attendees'] = new_attendees
-        self.service.events().update(calendarId='primary',
-                                     eventId=event['id'], body=event).execute()
+        updated_event = self.service.events().update(calendarId='primary',
+                                                     eventId=event['id'], body=event).execute()
+        print(updated_event)
 
 # cal = GoogleCal()
 # eventId = cal.list_events()
