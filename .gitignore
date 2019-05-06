@@ -1,3 +1,6 @@
+/.vscode
+/app
+/google_cal
 /credentials/credentials.py
 /credentials/token.pickle
 /credentials/credentials_google_cal.json

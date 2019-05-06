@@ -9,7 +9,8 @@ production = True
 
 class Crawler(object):
 
-    def __init__(self):
+    def __init__(self, logging):
+        self.logging = logging
         self.open_new_driver()
         self.min_sleep = 1.231
         self.max_sleep = 2.458
@@ -27,13 +28,14 @@ class Crawler(object):
         else:  # development mode:
             import os
             path = os.getcwd()
-            chrome_path = '/{}/chromedriver'.format(path)
+            chrome_path = '{}/chromedriver'.format(path)
             chrome_options = webdriver.ChromeOptions()
             # chrome_options.add_argument('--headless')
             # chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--incognito')
             chrome_options.add_argument('--disable-browser-side-navigation')
-            chrome_path = '/{}/old/chromedriver'.format(path)
+            # chrome_path = '/{}/old/chromedriver'.format(path)
+            self.logging.warning('Running on Development settings.')
             self.driver = webdriver.Chrome(
                 chrome_path, chrome_options=chrome_options)
 

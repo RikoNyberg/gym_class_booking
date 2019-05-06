@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 import time
 import datetime
-from pytz import timezone
+# from pytz import timezone
 import random
 from crawler import Crawler
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 import schedule
-from credentials import MONGO_URL, USERNAME, PASSWORD
+from google_calendar import GoogleCal
+from credentials import credentials
 from pymongo import MongoClient, errors
 import logging
 logging.basicConfig(format='%(message)s', level=logging.WARNING)
 
-gym_users_collection = MongoClient(MONGO_URL).gym.users
-gym_classes_collection = MongoClient(MONGO_URL).gym.reservations
+gym_users_collection = MongoClient(credentials.MONGO_URL).gym.users
+gym_classes_collection = MongoClient(credentials.MONGO_URL).gym.reservations
 
 
 def get_classes_to_register(membership_id=None):
@@ -48,14 +49,16 @@ def get_classes_to_register(membership_id=None):
 
 
 class GymClasses():
-    def __init__(self, username, password, name='Gym class update'):
-        self.tz = timezone('Europe/Helsinki')
+    def __init__(self, username, password, email, name='Gym class update'):
+        # self.tz = timezone('Europe/Helsinki')
         self.username = username
         self.password = password
+        self.email = email
         self.name = name
         self.website = 'Fitness24seven'
         logging.warning('\n{} crawler started.'.format(self.website))
-        self.crawler = Crawler()
+        self.crawler = Crawler(logging)
+        self.calendar = GoogleCal()
 
         self.gym_classes_collection = gym_classes_collection
         self.classes_to_register, self.classes_to_unregister, _ = get_classes_to_register(
@@ -109,6 +112,8 @@ class GymClasses():
             base_xpath.format(item='groupActivityListWaitingListSize'))
         self.clock_times = self.driver.find_elements_by_xpath(
             base_xpath.format(item='groupActivityListTime'))
+        self.booking_buttons = self.driver.find_elements_by_xpath(
+            base_xpath.format(item='groupActivityListAction'))
 
         self.check_that_element_counts_match(self.class_names, 'class_names')
         self.check_that_element_counts_match(self.instructors, 'instructors')
@@ -117,6 +122,8 @@ class GymClasses():
             self.free_capacitys, 'free_capacitys')
         self.check_that_element_counts_match(self.queues, 'queues')
         self.check_that_element_counts_match(self.clock_times, 'clock_times')
+        self.check_that_element_counts_match(
+            self.booking_buttons, 'booking_buttons')
 
     def check_that_element_counts_match(self, elem, elem_name):
         if len(elem) != self.gym_classes_count:
@@ -218,9 +225,9 @@ class GymClasses():
     def register_to_class(self, gym_class, j):
         for class_to_register in self.classes_to_register:
             if class_to_register['_id'] == gym_class['_id']:
-                book_class_button = self.driver.find_elements_by_xpath(
-                    "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']/a".format(item='groupActivityListAction'))[j]
-                if book_class_button:
+                book_class_button_list = self.booking_buttons[j].find_elements_by_xpath('.//a')
+                if len(book_class_button_list):
+                    book_class_button = book_class_button_list[0]
                     if book_class_button.text[:7] == 'Peruuta':
                         logging.warning('#### Class already registered: {} ####'.format(
                             class_to_register['_id']))
@@ -235,22 +242,35 @@ class GymClasses():
                     register_members_done_list = class_to_update.get(
                         'register_members_done', [])
                     register_members_done_list.append(self.username)
+                    ### Google calendar ####
+                    google_cal_event_id = class_to_update.get(
+                        'google_cal_event_id', '')
+                    if not google_cal_event_id:
+                        class_name = class_to_update['class_name']
+                        start = class_to_update['start_time']
+                        end = class_to_update['end_time']
+                        google_cal_event_id = self.calendar.add_event_accepted_attendee(class_name, start, end, self.email, accepted_attendee=True)
+                    else:
+                        self.calendar.add_attendee(google_cal_event_id, self.email, accepted_attendee=True)
+                    ########################
                     self.gym_classes_collection.update(
                         {'_id': class_to_register['_id']},
                         {'$set': {
                             'capacity_free': gym_class['capacity_free'],
                             'queue': gym_class['queue'],
                             'register_members_done': register_members_done_list,
+                            'google_cal_event_id': google_cal_event_id,
                         }})
                     self.registered_classes_count += 1
-                    break
+                else:
+                    continue # Reservation is not possible yet since the book_class_button does not exit
 
     def unregister_to_class(self, gym_class, j):
         for class_to_unregister in self.classes_to_unregister:
             if class_to_unregister['_id'] == gym_class['_id']:
-                book_class_button = self.driver.find_elements_by_xpath(
-                    "//*[@class='schedule']/tbody/tr[starts-with(@class,'row')]/td[@class='{item}']/a".format(item='groupActivityListAction'))[j]
-                if book_class_button:
+                book_class_button_list = self.booking_buttons[j].find_elements_by_xpath('.//a')
+                if len(book_class_button_list):
+                    book_class_button = book_class_button_list[0]
                     if book_class_button.text[:7] != 'Peruuta':
                         logging.warning('#### Class already un-registered: {} ####'.format(
                             class_to_unregister['_id']))
@@ -267,6 +287,12 @@ class GymClasses():
                     register_members_done_list = class_to_update.get(
                         'register_members_done', [])
                     register_members_done_list.remove(self.username)
+                    ### Google calendar ####
+                    google_cal_event_id = class_to_update.get(
+                        'google_cal_event_id', '')
+                    if google_cal_event_id:
+                        self.calendar.remove_attendee(google_cal_event_id, self.email)
+                    ########################
                     self.gym_classes_collection.update(
                         {'_id': class_to_unregister['_id']},
                         {'$set': {
@@ -274,8 +300,10 @@ class GymClasses():
                             'queue': gym_class['queue'],
                             'register_members_done': register_members_done_list,
                         }})
+                    
                     self.unregistered_classes_count += 1
-                    break
+                else:
+                    continue # Reservation is not possible yet since the book_class_button does not exit
 
     def quit_process(self):
         self.crawler.quit_driver(self.website)
@@ -289,31 +317,38 @@ class GymClasses():
             self.updated_classes_count))
         logging.warning('All classes: {}'.format(self.all_classes_count))
         logging.warning('Timestamp: {}'.format(
-            datetime.datetime.now(self.tz).strftime("%Y-%m-%d at %H:%M")))
+            datetime.datetime.now().strftime("%Y-%m-%d at %H:%M")))
         logging.warning('------------')
 
 
 def register_to_classes():
     _, _, membership_ids = get_classes_to_register()
     for membership_id in membership_ids:
-        user = gym_users_collection.find_one({'_id': membership_id}, {
-            '_id': 0, 'password': 1, 'name': 1})
-        print(user)
+        user = gym_users_collection.find_one({'_id': membership_id})
         if user:
+            username = user['_id']
+            password = user['password']
+            email = user['email']
+            name = user['name']
             gym_classes = GymClasses(
-                membership_id, user['password'], name=user['name'])
+                username, password, email, name=name)
             gym_classes.update_and_register_classes()
             continue
         logging.warning(
             'Trying to book classes to member {} who is not a registered user'.format(membership_id))
 
-
-def update_classes(username, password):
-    gym_classes = GymClasses(username, password)
+def update_classes():
+    user = gym_users_collection.find_one()
+    username = user['_id']
+    password = user['password']
+    email = user['email']
+    name = user['name']
+    gym_classes = GymClasses(username, password, email, name='Gym class update + {}'.format(name))
     gym_classes.update_and_register_classes()
 
 
-schedule.every().day.at("05:00").do(update_classes, USERNAME, PASSWORD)
+schedule.every().day.at("05:00").do(update_classes)
+# schedule.every(10).seconds.do(update_classes)
 schedule.every(5).minutes.do(register_to_classes)
 
 while True:
