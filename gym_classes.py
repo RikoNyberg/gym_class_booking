@@ -247,9 +247,9 @@ class GymClasses():
                         'google_cal_event_id', '')
                     if not google_cal_event_id:
                         class_name = class_to_update['class_name']
-                        start = class_to_update['start_time']
-                        end = class_to_update['end_time']
-                        google_cal_event_id = self.calendar.add_event_accepted_attendee(class_name, start, end, self.email, accepted_attendee=True)
+                        start_time = class_to_update['start_time']
+                        end_time = class_to_update['end_time']
+                        google_cal_event_id = self.calendar.add_event_accepted_attendee(class_name, start_time, end_time, email=self.email, accepted_attendee=True)
                     else:
                         self.calendar.add_attendee(google_cal_event_id, self.email, accepted_attendee=True)
                     ########################

@@ -9,6 +9,17 @@ from google.auth.transport.requests import Request
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+
+# class MemoryCache(Cache):
+#     # This is a Class that is fixing a known cache bug: https://github.com/googleapis/google-api-python-client/issues/325#issuecomment-274349841
+#     _CACHE = {}
+
+#     def get(self, url):
+#         return MemoryCache._CACHE.get(url)
+
+#     def set(self, url, content):
+#         MemoryCache._CACHE[url] = content
+
 class GoogleCal():
     def __init__(self):
         self.service = self.get_service()
@@ -24,10 +35,10 @@ class GoogleCal():
                 creds.refresh(Request())
             with open('credentials/token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
-        if not creds:    
+        if not creds:
             raise ValueError('Google API token.pickle is missing')
-        service = build('calendar', 'v3', credentials=creds)
-        
+        service = build('calendar', 'v3', credentials=creds, cache_discovery=False)
+
         return service
 
     def list_events(self):
@@ -35,11 +46,11 @@ class GoogleCal():
         Prints the start and name of the next 10 events on the user's calendar.
         """
         # Call the Calendar API
-        now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+        now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
         print('Getting the upcoming 10 events')
         events_result = self.service.events().list(calendarId='primary', timeMin=now,
-                                            maxResults=10, singleEvents=True,
-                                            orderBy='startTime').execute()
+                                                   maxResults=10, singleEvents=True,
+                                                   orderBy='startTime').execute()
         events = events_result.get('items', [])
 
         if not events:
@@ -47,39 +58,43 @@ class GoogleCal():
         for event in events:
             start = event['start'].get('dateTime', event['start'].get('date'))
             print(start, event['summary'], event['id'])
-        
+
         if len(events):
             return events[0]['id']
         return None
-    def add_event(self, class_name, start, end, email, accepted_attendee=False):
-        if accepted_attendee:
-            attendee = {'email': email, 'responseStatus': 'accepted'}
+
+    def add_event(self, class_name, start_time, end_time, email=None, accepted_attendee=False):
+        if email:
+            if accepted_attendee:
+                attendee = [{'email': email, 'responseStatus': 'accepted'}]
+            else:
+                attendee = [{'email': email}]
         else:
-            attendee = {'email': email}
-        
+            attendee = []
+
         event = {
-        'summary': 'F24 - {}'.format(class_name),
-        'location': 'Antinkatu 1, 00100 Helsinki',
-        'description': 'Great job! Doing sports is always a good and healthy way to spend time :)',
-        'start': {
-            'dateTime': start.strftime('%Y-%m-%dT%H:%M:%S'),
-            'timeZone': 'Europe/Helsinki',
-        },
-        'end': {
-            'dateTime': end.strftime('%Y-%m-%dT%H:%M:%S'),
-            'timeZone': 'Europe/Helsinki',
-        },
-        'recurrence': [
-            'RRULE:FREQ=DAILY;COUNT=1'
-        ],
-        'attendees': [attendee],
-        'reminders': {
-            'useDefault': False,
-            'overrides': [
-            # {'method': 'email', 'minutes': 24 * 60},
-            {'method': 'popup', 'minutes': 60},
+            'summary': 'F24 - {}'.format(class_name),
+            'location': 'Antinkatu 1, 00100 Helsinki',
+            'description': 'Great job! Doing sports is always a good and healthy way to spend time :)',
+            'start': {
+                'dateTime': start_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                'timeZone': 'Europe/Helsinki',
+            },
+            'end': {
+                'dateTime': end_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                'timeZone': 'Europe/Helsinki',
+            },
+            'recurrence': [
+                'RRULE:FREQ=DAILY;COUNT=1'
             ],
-        },
+            'attendees': attendee,
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    # {'method': 'email', 'minutes': 24 * 60},
+                    {'method': 'popup', 'minutes': 60},
+                ],
+            },
         }
         event = self.service.events().insert(calendarId='primary', body=event).execute()
 
@@ -97,7 +112,8 @@ class GoogleCal():
         # First retrieve the event from the API.
         event = self.service.events().get(calendarId='primary', eventId=eventId).execute()
         event['attendees'].append(attendee)
-        updated_event = self.service.events().update(calendarId='primary', eventId=event['id'], body=event).execute()
+        updated_event = self.service.events().update(
+            calendarId='primary', eventId=event['id'], body=event).execute()
 
     def remove_attendee(self, eventId, email):
         # First retrieve the event from the API.
@@ -109,7 +125,8 @@ class GoogleCal():
             else:
                 new_attendees.append(attendee)
         event['attendees'] = new_attendees
-        self.service.events().update(calendarId='primary', eventId=event['id'], body=event).execute()
+        self.service.events().update(calendarId='primary',
+                                     eventId=event['id'], body=event).execute()
 
 # cal = GoogleCal()
 # eventId = cal.list_events()
