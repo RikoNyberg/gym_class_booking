@@ -249,7 +249,7 @@ class GymClasses():
                         class_name = class_to_update['class_name']
                         start_time = class_to_update['start_time']
                         end_time = class_to_update['end_time']
-                        google_cal_event_id = self.calendar.add_event_accepted_attendee(class_name, start_time, end_time, email=self.email, accepted_attendee=True)
+                        google_cal_event_id = self.calendar.add_event(class_name, start_time, end_time, email=self.email, accepted_attendee=True)
                     else:
                         self.calendar.add_attendee(google_cal_event_id, self.email, accepted_attendee=True)
                     ########################
@@ -322,7 +322,9 @@ class GymClasses():
 
 
 def register_to_classes():
-    _, _, membership_ids = get_classes_to_register()
+    r, u, membership_ids = get_classes_to_register()
+    logging.warning('\n---- Registering to classes ----\n{}\n'.format(r))
+    logging.warning('---- Un-registering to classes ----\n{}\n'.format(u))
     for membership_id in membership_ids:
         user = gym_users_collection.find_one({'_id': membership_id})
         if user:
