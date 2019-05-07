@@ -20,9 +20,10 @@ gym_classes_collection = MongoClient(credentials.MONGO_URL).gym.reservations
 
 def get_classes_to_register(membership_id=None):
     gym_classes = gym_classes_collection.find({
-        'start_time':
-        {'$lte': (datetime.datetime.now() +
-                  datetime.timedelta(days=2) + datetime.timedelta(hours=2))}
+        'start_time': {
+            '$gte:': datetime.datetime.now(),
+            '$lte': (datetime.datetime.now() + datetime.timedelta(days=2) + datetime.timedelta(hours=2))
+        }
     })
 
     gym_classes_to_register = []
