@@ -21,7 +21,7 @@ gym_classes_collection = MongoClient(credentials.MONGO_URL).gym.reservations
 def get_classes_to_register(membership_id=None):
     gym_classes = gym_classes_collection.find({
         'start_time': {
-            '$gte:': datetime.datetime.now(),
+            '$gte': datetime.datetime.now(),
             '$lte': (datetime.datetime.now() + datetime.timedelta(days=2) + datetime.timedelta(hours=2))
         }
     })
@@ -351,7 +351,7 @@ def update_classes():
 
 
 schedule.every().day.at("05:00").do(update_classes)
-# schedule.every(10).seconds.do(update_classes)
+# schedule.every(1).seconds.do(register_to_classes)
 schedule.every(5).minutes.do(register_to_classes)
 
 while True:
